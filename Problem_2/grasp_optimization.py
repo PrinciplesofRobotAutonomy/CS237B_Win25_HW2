@@ -71,7 +71,6 @@ def grasp_optimization(grasp_normals, points, friction_coeffs, wrench_ext):
     x = solve_socp(x, As, bs, cs, ds, F, g, h, verbose=False)
 
     # TODO: extract the grasp forces from x as a stacked 1D vector
-    f = x[:-1]
 
     ########## Your code ends here ##########
 
@@ -117,7 +116,7 @@ def precompute_force_closure(grasp_normals, points, friction_coeffs):
             wrench_ext - external wrench applied to the object.
 
         Return:
-            f - grasp forces as a list of M numpy arrays.
+            forces - grasp forces as a list of M numpy arrays.
         """
 
         ########## Your code starts here ##########
