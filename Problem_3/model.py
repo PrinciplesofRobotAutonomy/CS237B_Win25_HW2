@@ -1,10 +1,12 @@
-import tensorflow as tf 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 DIM_IMG = (224, 224)
 
-class AccelerationLaw(tf.keras.layers.Layer):
+class AccelerationLaw(nn.Module):
     """
-    Tensorflow layer to evaluate the acceleration law:
+    PyTorch layer to evaluate the acceleration law:
 
         a = g * (sin(th) - mu * cos(th))
 
@@ -13,94 +15,80 @@ class AccelerationLaw(tf.keras.layers.Layer):
     units are unknown.
     """
 
-    def __init__(self, **kwargs):
-        super(AccelerationLaw, self).__init__(**kwargs)
+    def __init__(self):
+        super(AccelerationLaw, self).__init__()
 
-    def build(self, input_shape):
-        self.g = self.add_weight(name='g', shape=(1,), initializer=tf.keras.initializers.Constant(16), trainable=True)
+        ################### Your code starts here ########################
+        # TODO: Create a Parameter for g: acceleration due to gravity using nn.Parameter of size 16
 
-    def call(self, inputs):
-        mu, th = inputs
 
-        ########## Your code starts here ##########
-        a = None  # TODO
-        ########## Your code ends here ##########
+        ################### Your code starts here ########################
 
-        # Ensure output acceleration is positive
-        return a
+    def forward(self, mu, th):
 
-def build_model():
-    """
-    Build the acceleration prediction network.
+        ################### Your code starts here ########################
+        # Use the acceleration law to compute a and return it
+        
+        pass # REMOVE THIS LINE
+    
+        ################### Your code starts here ########################
 
-    The network takes two inputs:
-        img - first frame of the video
-        th  - incline angle of the ramp [rad]
+class AccelerationPredictionNetwork(nn.Module):
+    def __init__(self):
+        super(AccelerationPredictionNetwork, self).__init__()
 
-    The output is:
-        a - predicted acceleration of the object [pixels/frame^2]
+        ################### Your code starts here ########################
+        # Create a prediction network design of your choice here.
+        # We recommend using Conv2D, pooling and dropout layers,
+        # followed by specific layers to represent your final p_class and mu
 
-    The last two layers of the network before the AccelerationLaw layer should be:
-        p_class - A fully connected layer of size 32 with softmax output. This
-                  represents a probability distribution over 32 possible classes
-                  for the material of the object.
-                  NOTE: Name this layer 'p_class'!
-        mu - A vector of 32 weights representing the friction coefficients of
-             each material class. The dot product of these weights and p_class
-             represent the predicted friction coefficient of the object in the
-             video.
-             NOTE: Name this layer 'mu'!
-    """
 
-    img_input = tf.keras.Input(shape=(DIM_IMG[1], DIM_IMG[0], 3), name='img')
-    th_input = tf.keras.Input(shape=(1,), name='th')
+        ################### Your code ends here ########################
 
-    ########## Your code starts here ##########
-    # TODO: Create your neural network and replace the following two layers
-    #       according to the given specification.
+        self.acceleration_law = AccelerationLaw()
 
-    p_class = tf.keras.layers.Dense(1, name='p_class')(img_input)
-    mu = tf.keras.layers.Dense(1, name='mu')(p_class)
+    def forward(self, img, th):
 
-    ########## Your code ends here ##########
+        ################### Your code starts here ########################
+        # Pass the inputs through the layers to compute p_class and then mu
 
-    a_pred = AccelerationLaw(name='a')((mu, th_input))
 
-    return tf.keras.Model(inputs=[img_input, th_input], outputs=[a_pred])
+        ################### Your code ends here ########################
+        
+        a_pred = self.acceleration_law(mu, th)
+        return a_pred
 
-def build_baseline_model():
-    """
-    Build a baseline acceleration prediction network.
+class BaselineNetwork(nn.Module):
+    def __init__(self):
+        super(BaselineNetwork, self).__init__()
 
-    The network takes one input:
-        img - first frame of the video
+        ################### Your code starts here ########################
+        # Copy the model layers you used in your design for the AccelerationPredictionNetwork
 
-    The output is:
-        a - predicted acceleration of the object [pixels/frame^2]
+        ################### Your code ends here ########################
 
-    The structure of this network should match the other model before the
-    p_class layer. Instead of outputting p_class, it should directly output a
-    scalar value representing the predicted acceleration (without using the
-    AccelerationLaw layer).
-    """
+    def forward(self, img):
 
-    img_input = tf.keras.Input(shape=(DIM_IMG[1], DIM_IMG[0], 3), name='img')
-    th_input = tf.keras.Input(shape=(1,), name='th')
+        ################### Your code starts here ########################
+        # Compute a_pred similar to before except without the acceleration law
 
-    ########## Your code starts here ##########
-    # TODO: Replace the following with your model from build_model().
 
-    ########## Your code ends here ##########
 
-    return tf.keras.Model(inputs=[img_input, th_input], outputs=[a_pred])
+
+        a_pred = ...
+
+        ################### Your code ends here ########################
+        return a_pred
 
 def loss(a_actual, a_pred):
     """
-    Loss function: L2 norm of the error between a_actual and a_pred.
+    Loss function: L2 norm of the error between a_actual and a_pred for a batch of samples.
     """
+    ################### Your code starts here ########################
+    # Compute the MSE loss between the actual and predicted accelerations
 
-    ########## Your code starts here ##########
-    l = None  # TODO
-    ########## Your code ends here ##########
+    loss = None # Replace this line
 
-    return l
+    ################### Your code ends here ########################
+
+    return loss

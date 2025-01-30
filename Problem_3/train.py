@@ -1,58 +1,86 @@
 #!/usr/bin/env python
 
 import argparse
-import tensorflow as tf 
-import pdb 
-import os 
+import torch
+import torch.optim as optim
+import os
+from torch.utils.tensorboard import SummaryWriter
 
-from model import build_model, build_baseline_model, loss
+from model import AccelerationPredictionNetwork, BaselineNetwork, loss
 import utils
 
 SIZE_BATCH = 32
-LEARNING_RATE=0.0001
+LEARNING_RATE = 0.0001
 NUM_EPOCHS = 50
 
-PATH_CHECKPOINT = os.path.join('trained_models', 'cp-{epoch:03d}.ckpt')
+PATH_CHECKPOINT = os.path.join('trained_models', 'cp-{epoch:03d}.pt')
 DIR_MODEL = 'trained_models'
+
+def train_model(model, train_loader, optimizer, epoch, writer):
+    model.train()
+    for batch_idx, batch in enumerate(train_loader):
+        optimizer.zero_grad()
+        if isinstance(model, BaselineNetwork):
+            images, targets = batch[0], batch[1]
+            outputs = model(images)
+        else:
+            images, angles, targets = batch
+            outputs = model(images, angles)
+        loss_value = loss(targets, outputs)
+        loss_value.backward()
+        optimizer.step()
+        writer.add_scalar('Loss/train', loss_value.item(), epoch * len(train_loader) + batch_idx)
+        if batch_idx % 10 == 0:
+            print(f'Train Epoch: {epoch} [{batch_idx * len(images)}/{len(train_loader.dataset)} '
+                  f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss_value.item():.6f}')
+
+def test_model(model, test_loader, writer, epoch):
+    model.eval()
+    test_loss = 0
+    with torch.no_grad():
+        for batch in test_loader:
+            if isinstance(model, BaselineNetwork):
+                images, targets = batch[0], batch[1]
+                outputs = model(images)
+            else:
+                images, angles, targets = batch
+                outputs = model(images, angles)
+            test_loss += loss(targets, outputs).item()
+    test_loss /= len(test_loader.dataset)
+    writer.add_scalar('Loss/test', test_loss, epoch)
+    print(f'\nTest set: Average loss: {test_loss:.4f}\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--baseline', dest='baseline', action='store_true')
     args = parser.parse_args()
 
+    # Create directory if it doesn't exist
+    os.makedirs(DIR_MODEL, exist_ok=True)
+
     # Load dataset
     ramp_dataset_path = os.path.join('phys101', 'scenarios', 'ramp')
-    train_dataset, test_dataset = utils.load_dataset(ramp_dataset_path,
-                                                     ramp_surface=1,  # Choose ramp surface in experiments (1 or 2)
-                                                     size_batch=SIZE_BATCH)
+    train_loader, test_loader = utils.load_dataset(ramp_dataset_path,
+                                                   ramp_surface=1,  # Choose ramp surface in experiments (1 or 2)
+                                                   size_batch=SIZE_BATCH)
 
     # Build model
     if args.baseline:
-        model = build_baseline_model()
-        path_model = os.path.join(DIR_MODEL, "trained_baseline.h5")
+        model = BaselineNetwork()
+        path_model = os.path.join(DIR_MODEL, "trained_baseline.pt")
     else:
-        model = build_model()
-        path_model = os.path.join(DIR_MODEL, "trained.h5")
+        model = AccelerationPredictionNetwork()
+        path_model = os.path.join(DIR_MODEL, "trained.pt")
 
-    model.compile(optimizer=tf.keras.optimizers.Adam(LEARNING_RATE),
-                  loss=loss)
-
-    # Checkpoint callback
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=PATH_CHECKPOINT,
-                                                     save_weights_only=True,
-                                                     verbose=1,
-                                                     period=5)
-
-    # Tensorboard callback
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir='train_logs', update_freq='batch')
-
-    model.summary()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    writer = SummaryWriter(log_dir='train_logs')
 
     # Train model
-    model.fit(train_dataset,
-              epochs=NUM_EPOCHS,
-              validation_data=test_dataset,
-              steps_per_epoch=20,
-              callbacks=[tensorboard_callback, cp_callback])
+    for epoch in range(1, NUM_EPOCHS + 1):
+        train_model(model, train_loader, optimizer, epoch, writer)
+        test_model(model, test_loader, writer, epoch)
+        if epoch % 5 == 0:
+            torch.save(model.state_dict(), PATH_CHECKPOINT.format(epoch=epoch))
 
-    model.save(path_model)
+    torch.save(model.state_dict(), path_model)
+    writer.close()

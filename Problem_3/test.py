@@ -5,9 +5,9 @@ import argparse, os, pickle, re, pdb, glob
 import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf 
+import torch
 
-from model import build_model, build_baseline_model, loss, AccelerationLaw
+from model import AccelerationPredictionNetwork, BaselineNetwork, loss
 import utils
 
 SIZE_BATCH = 32
@@ -17,6 +17,7 @@ DIR_DATASET = os.path.join('phys101', 'scenarios', 'ramp')
 
 def load_video(path_video):
     # Load video
+    print(len(path_video), type(path_video[0]))
     video = cv.VideoCapture(path_video)
     fps = video.get(cv.CAP_PROP_FPS)
     num_frames = int(video.get(cv.CAP_PROP_FRAME_COUNT))
@@ -32,7 +33,6 @@ def load_video(path_video):
 
 def show_image(frames, idx_frame, path_video, keypoints, params):
     color = (0,0,255)
-    #search_path = os.path.join('phys101', 'scenarios', 'ramp', '(.*)', 'Camera_1.mp4')
     search_path = r'phys101/scenarios/ramp/(.*)/Camera_1.mp4'
     print(path_video)
     experiment = re.search(search_path, path_video).group(1)
@@ -49,8 +49,9 @@ def show_image(frames, idx_frame, path_video, keypoints, params):
                          (50,100), cv.FONT_HERSHEY_DUPLEX, 0.5, color, 1)
     img = cv.putText(img, "mu_class", (750, 30), cv.FONT_HERSHEY_DUPLEX, 0.5, color, 1)
     img = cv.putText(img, "p_class", (850, 30), cv.FONT_HERSHEY_DUPLEX, 0.5, color, 1)
+
     if 'p_class' in params:
-        for i, (mu, p) in enumerate(zip(params['mu_class'].tolist(), params['p_class'].tolist())):
+        for i, (mu, p) in enumerate(zip(params['mu_class'], params['p_class'])):
             img = cv.putText(img, "{:.3f}".format(mu),
                              (750,55 + 15*i), cv.FONT_HERSHEY_DUPLEX, 0.5, color, 1)
             img = cv.putText(img, "{:.3f}".format(p),
@@ -95,6 +96,8 @@ def handle_dataset(video_paths, keypoints, params):
         idx_video = max(0, min(len(video_paths) - 1, idx_video))
 
         path_video = video_paths[idx_video]
+
+        print("Video Path: ", path_video)
         frames = load_video(path_video)
         kp = keypoints[path_video]
         p = {
@@ -103,7 +106,7 @@ def handle_dataset(video_paths, keypoints, params):
         }
         if 'mu_class' in params:
             p['mu_pred'] = params['mu_pred'][idx_video][0]
-            p['mu_class'] = params['mu_class']
+            p['mu_class'] = params['mu_class'][0]
             p['p_class'] = params['p_class'][idx_video]
 
         key = handle_video(frames, path_video, kp, p)
@@ -143,11 +146,7 @@ def compute_accelerations(video_paths, keypoints):
 def load_keypoints(dir_dataset, ramp_surface):
     dataset_path = os.path.join('phys101', 'scenarios', 'ramp', '*', '*', '*', 'Camera_1.mp4')
     dataset_fnames = [fname.replace(os.sep, "/") for fname in glob.glob(dataset_path)]
-    #dataset = tf.data.Dataset.list_files(dataset_path, shuffle=False)
-    dataset = tf.data.Dataset.from_tensor_slices(dataset_fnames)
-    size_dataset = tf.data.experimental.cardinality(dataset).numpy() - 1  # 1804 (w/o last video - broken)
-    dataset = dataset.take(size_dataset)
-    video_paths = [d.numpy().decode('utf-8') for d in dataset]
+    video_paths = dataset_fnames
 
     if os.path.exists('keypoints.pkl'):
         with open('keypoints.pkl', 'rb') as f:
@@ -158,6 +157,13 @@ def load_keypoints(dir_dataset, ramp_surface):
         keypoints_dict[path] = kp
     return keypoints_dict
 
+def get_p_class_output(model, input):
+    input = model.dropout(model.pool(model.conv1(input)))
+    input = model.dropout(model.pool(model.conv2(input)))
+    input = model.flatten(input)
+    input = model.fc1(input)
+    return model.fc2(input)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--baseline', dest='baseline', action='store_true')
@@ -165,37 +171,58 @@ if __name__ == '__main__':
 
     # Load dataset
     ramp_surface = 1  # Choose ramp surface in experiments (1 or 2)
-    _, test_dataset = utils.load_dataset(DIR_DATASET,
-                                         ramp_surface=ramp_surface,
-                                         size_batch=SIZE_BATCH,
-                                         return_filenames=True)
-    video_paths = [p.decode('utf-8') for p in np.concatenate([d[0][2] for d in test_dataset]).tolist()]
-    a_groundtruth = np.concatenate([d[1] for d in test_dataset])
+    _, test_loader = utils.load_dataset(DIR_DATASET,
+                                        ramp_surface=ramp_surface,
+                                        size_batch=SIZE_BATCH,
+                                        return_filenames=True)
+    
+
+    print([d[2] for d in test_loader])
+
+    video_paths = [p for p in np.concatenate([d[2] for d in test_loader]).tolist()]
+
+    print("Vid Paths: ", video_paths)
+    a_groundtruth = np.concatenate([d[1] for d in test_loader])
 
     # Load dataset again without the filenames 
-    _, test_dataset = utils.load_dataset(DIR_DATASET,
-                                         ramp_surface=ramp_surface,
-                                         size_batch=SIZE_BATCH)
+    _, test_loader = utils.load_dataset(DIR_DATASET,
+                                        ramp_surface=ramp_surface,
+                                        size_batch=SIZE_BATCH)
     # Build model
     if args.baseline:
-        model = tf.keras.models.load_model(DIR_CHECKPOINT + 'trained_baseline.h5', custom_objects={'loss': loss})
-        a_pred = model.predict(test_dataset)
+        model = BaselineNetwork()
+        model.load_state_dict(torch.load(DIR_CHECKPOINT + 'trained_baseline.pt'))
+        model.eval()
+        a_pred = []
+        with torch.no_grad():
+            for batch in test_loader:
+                outputs = model(batch[0])
+                a_pred.append(outputs.numpy())
+        a_pred = np.concatenate(a_pred)
         parameters = {
             'a_pred': np.maximum(0., a_pred),
             'a_groundtruth': a_groundtruth
         }
     else:
-        model = tf.keras.models.load_model(DIR_CHECKPOINT + 'trained.h5', custom_objects={'AccelerationLaw': AccelerationLaw, 'loss': loss})
-        # model.load_weights(tf.train.latest_checkpoint(DIR_CHECKPOINT))
-
-        outputs = [model.output,
-                   model.get_layer('p_class').output,
-                   model.get_layer('mu').output,
-                  ]
-        model = tf.keras.Model(inputs=model.input, outputs=outputs)
-        mu_class = model.get_layer('mu').get_weights()[0][:,0]
-        g = model.get_layer('a').get_weights()[0]
-        a_pred, p_class, mu_pred = model.predict(test_dataset)
+        model = AccelerationPredictionNetwork()
+        model.load_state_dict(torch.load(DIR_CHECKPOINT + 'trained.pt'))
+        model.eval()
+        a_pred = []
+        p_class = []
+        mu_pred = []
+        with torch.no_grad():
+            for images, angles, _ in test_loader:
+                outputs = model(images, angles)
+                a_pred.append(outputs.numpy())
+                p_class_output = get_p_class_output(model, images)
+                mu_pred.append(model.mu(p_class_output).numpy())
+                p_class.append(p_class_output.numpy())
+        a_pred = np.concatenate(a_pred)
+        p_class = np.concatenate(p_class)
+        mu_pred = np.concatenate(mu_pred)
+        
+        mu_class = model.mu.weight.data.cpu().numpy()
+        g = model.acceleration_law.g.detach().numpy()
         parameters = {
             'a_pred': np.maximum(0., a_pred),
             'a_groundtruth': a_groundtruth,
