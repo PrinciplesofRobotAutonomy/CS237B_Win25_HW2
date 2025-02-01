@@ -10,8 +10,10 @@ from model import AccelerationPredictionNetwork, BaselineNetwork, loss
 import utils
 
 SIZE_BATCH = 32
-LEARNING_RATE = 0.0001
-NUM_EPOCHS = 50
+
+# Feel free to experiment with these parameters!
+LEARNING_RATE = 1e-5
+NUM_EPOCHS = 30
 
 PATH_CHECKPOINT = os.path.join('trained_models', 'cp-{epoch:03d}.pt')
 DIR_MODEL = 'trained_models'
@@ -26,6 +28,8 @@ def train_model(model, train_loader, optimizer, epoch, writer):
         else:
             images, angles, targets = batch
             outputs = model(images, angles)
+
+        targets = targets.reshape(-1, 1)
         loss_value = loss(targets, outputs)
         loss_value.backward()
         optimizer.step()
@@ -45,7 +49,7 @@ def test_model(model, test_loader, writer, epoch):
             else:
                 images, angles, targets = batch
                 outputs = model(images, angles)
-            test_loss += loss(targets, outputs).item()
+            test_loss += loss(targets.reshape(-1, 1), outputs).item()
     test_loss /= len(test_loader.dataset)
     writer.add_scalar('Loss/test', test_loss, epoch)
     print(f'\nTest set: Average loss: {test_loss:.4f}\n')

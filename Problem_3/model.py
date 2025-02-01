@@ -19,12 +19,17 @@ class AccelerationLaw(nn.Module):
         super(AccelerationLaw, self).__init__()
 
         ################### Your code starts here ########################
-        # TODO: Create a Parameter for g: acceleration due to gravity using nn.Parameter of size 16
+        # TODO: Define a trainable Parameter for scalar g: acceleration due to gravity
+        # Use nn.Parameter with initial value 16
 
 
         ################### Your code starts here ########################
 
     def forward(self, mu, th):
+
+        # Reshape to prevent bad broadcasting
+        mu = mu.reshape(-1, 1)
+        th = th.reshape(-1, 1)
 
         ################### Your code starts here ########################
         # Use the acceleration law to compute a and return it
@@ -47,12 +52,30 @@ class AccelerationPredictionNetwork(nn.Module):
 
         self.acceleration_law = AccelerationLaw()
 
+    def get_p_class_output(self, input):
+        """
+        function to output and store the p_class output.
+
+        Parameter:
+            input: the model img input
+
+        Return:
+            returns the output from the p_class layer after performing Softmax 
+        """
+        ################### Your code starts here ########################
+
+
+        p_class_output = ...
+    
+        ################### Your code ends here ########################
+        return p_class_output
+
     def forward(self, img, th):
 
         ################### Your code starts here ########################
         # Pass the inputs through the layers to compute p_class and then mu
 
-
+        mu = ...
         ################### Your code ends here ########################
         
         a_pred = self.acceleration_law(mu, th)

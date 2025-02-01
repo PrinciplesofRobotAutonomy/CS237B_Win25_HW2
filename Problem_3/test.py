@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from model import AccelerationPredictionNetwork, BaselineNetwork, loss
+from model import AccelerationPredictionNetwork, BaselineNetwork, loss, AccelerationLaw
 import utils
 
 SIZE_BATCH = 32
@@ -17,10 +17,9 @@ DIR_DATASET = os.path.join('phys101', 'scenarios', 'ramp')
 
 def load_video(path_video):
     # Load video
-    print(len(path_video), type(path_video[0]))
     video = cv.VideoCapture(path_video)
-    fps = video.get(cv.CAP_PROP_FPS)
-    num_frames = int(video.get(cv.CAP_PROP_FRAME_COUNT))
+    # fps = video.get(cv.CAP_PROP_FPS)
+    # num_frames = int(video.get(cv.CAP_PROP_FRAME_COUNT))
 
     frames = []
     while True:
@@ -34,7 +33,6 @@ def load_video(path_video):
 def show_image(frames, idx_frame, path_video, keypoints, params):
     color = (0,0,255)
     search_path = r'phys101/scenarios/ramp/(.*)/Camera_1.mp4'
-    print(path_video)
     experiment = re.search(search_path, path_video).group(1)
     img = frames[idx_frame].copy()
 
@@ -97,7 +95,6 @@ def handle_dataset(video_paths, keypoints, params):
 
         path_video = video_paths[idx_video]
 
-        print("Video Path: ", path_video)
         frames = load_video(path_video)
         kp = keypoints[path_video]
         p = {
@@ -144,7 +141,7 @@ def compute_accelerations(video_paths, keypoints):
     return accelerations
 
 def load_keypoints(dir_dataset, ramp_surface):
-    dataset_path = os.path.join('phys101', 'scenarios', 'ramp', '*', '*', '*', 'Camera_1.mp4')
+    dataset_path = os.path.join(dir_dataset, '*', '*', '*', 'Camera_1.mp4')
     dataset_fnames = [fname.replace(os.sep, "/") for fname in glob.glob(dataset_path)]
     video_paths = dataset_fnames
 
@@ -156,13 +153,6 @@ def load_keypoints(dir_dataset, ramp_surface):
     for path, kp in zip(video_paths, keypoints):
         keypoints_dict[path] = kp
     return keypoints_dict
-
-def get_p_class_output(model, input):
-    input = model.dropout(model.pool(model.conv1(input)))
-    input = model.dropout(model.pool(model.conv2(input)))
-    input = model.flatten(input)
-    input = model.fc1(input)
-    return model.fc2(input)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -176,12 +166,8 @@ if __name__ == '__main__':
                                         size_batch=SIZE_BATCH,
                                         return_filenames=True)
     
-
-    print([d[2] for d in test_loader])
-
     video_paths = [p for p in np.concatenate([d[2] for d in test_loader]).tolist()]
 
-    print("Vid Paths: ", video_paths)
     a_groundtruth = np.concatenate([d[1] for d in test_loader])
 
     # Load dataset again without the filenames 
@@ -214,7 +200,7 @@ if __name__ == '__main__':
             for images, angles, _ in test_loader:
                 outputs = model(images, angles)
                 a_pred.append(outputs.numpy())
-                p_class_output = get_p_class_output(model, images)
+                p_class_output = model.get_p_class_output(images)
                 mu_pred.append(model.mu(p_class_output).numpy())
                 p_class.append(p_class_output.numpy())
         a_pred = np.concatenate(a_pred)
