@@ -48,6 +48,10 @@ class AccelerationPredictionNetwork(nn.Module):
         # followed by specific layers to represent your final p_class and mu
 
 
+
+        self.p_class = ...
+        self.mu = ...
+
         ################### Your code ends here ########################
 
         self.acceleration_law = AccelerationLaw()
