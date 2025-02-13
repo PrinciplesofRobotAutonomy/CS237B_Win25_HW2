@@ -43,10 +43,10 @@ def load_dataset(path_experiment, ramp_surface=1, size_batch=1, return_filenames
     fnames = [fname.replace(os.sep, "/") for fname in fnames]
 
     # Compute size of dataset
-    size_dataset = len(fnames) - 1  # 1804 (w/o last video - broken)
+    size_dataset = len(fnames) - 1 
     num_batches = int((size_dataset + 0.5) / size_batch)
-    num_test = num_batches // 5  # 1
-    num_train = num_batches - num_test  # 14
+    num_test = num_batches // 5
+    num_train = num_batches - num_test
 
     # Load acceleration labels
     accelerations = load_accelerations('accelerations.log', fnames)
@@ -72,7 +72,7 @@ def load_dataset(path_experiment, ramp_surface=1, size_batch=1, return_filenames
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=size_batch, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=size_batch, shuffle=False)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=size_batch, shuffle=True)
 
     return train_loader, test_loader
 
