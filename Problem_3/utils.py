@@ -66,8 +66,8 @@ def load_dataset(path_experiment, ramp_surface=1, size_batch=1, return_filenames
     dataset = list(zip(*input_tuple, accelerations))  # Include filenames directly if required
 
     # Create train and test datasets
-    test_indices = range(num_test)
-    train_indices = range(num_test, len(dataset))
+    test_indices = range(num_test*size_batch)
+    train_indices = range(num_test*size_batch, len(dataset))
     test_dataset = torch.utils.data.Subset(dataset, test_indices)
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
 

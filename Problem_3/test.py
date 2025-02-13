@@ -182,7 +182,7 @@ if __name__ == '__main__':
         a_pred = []
         with torch.no_grad():
             for batch in test_loader:
-                outputs = model(batch[0])
+                outputs = model(batch[3])
                 a_pred.append(outputs.numpy())
         a_pred = np.concatenate(a_pred)
         parameters = {

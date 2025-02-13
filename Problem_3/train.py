@@ -23,7 +23,7 @@ def train_model(model, train_loader, optimizer, epoch, writer):
     for batch_idx, batch in enumerate(train_loader):
         optimizer.zero_grad()
         if isinstance(model, BaselineNetwork):
-            images, targets = batch[0], batch[1]
+            images, _, targets = batch
             outputs = model(images)
         else:
             images, angles, targets = batch
