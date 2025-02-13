@@ -168,7 +168,7 @@ if __name__ == '__main__':
     
     video_paths = [p for p in np.concatenate([d[2] for d in test_loader]).tolist()]
 
-    a_groundtruth = np.concatenate([d[1] for d in test_loader])
+    a_groundtruth = np.concatenate([d[-1] for d in test_loader])
 
     # Load dataset again without the filenames 
     _, test_loader = utils.load_dataset(DIR_DATASET,
@@ -182,7 +182,7 @@ if __name__ == '__main__':
         a_pred = []
         with torch.no_grad():
             for batch in test_loader:
-                outputs = model(batch[3])
+                outputs = model(batch[-1])
                 a_pred.append(outputs.numpy())
         a_pred = np.concatenate(a_pred)
         parameters = {

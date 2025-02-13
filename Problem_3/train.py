@@ -12,8 +12,8 @@ import utils
 SIZE_BATCH = 32
 
 # Feel free to experiment with these parameters!
-LEARNING_RATE = 1e-5
-NUM_EPOCHS = 30
+LEARNING_RATE = 1e-5 # Testing NUMBERS! Prev: 1e-4
+NUM_EPOCHS = 30 # Testing Numbers! Prev: 50
 
 PATH_CHECKPOINT = os.path.join('trained_models', 'cp-{epoch:03d}.pt')
 DIR_MODEL = 'trained_models'
@@ -44,7 +44,7 @@ def test_model(model, test_loader, writer, epoch):
     with torch.no_grad():
         for batch in test_loader:
             if isinstance(model, BaselineNetwork):
-                images, targets = batch[0], batch[1]
+                images, _, targets = batch
                 outputs = model(images)
             else:
                 images, angles, targets = batch
