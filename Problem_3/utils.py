@@ -72,7 +72,7 @@ def load_dataset(path_experiment, ramp_surface=1, size_batch=1, return_filenames
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=size_batch, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=size_batch, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=size_batch, shuffle=False)
 
     return train_loader, test_loader
 
