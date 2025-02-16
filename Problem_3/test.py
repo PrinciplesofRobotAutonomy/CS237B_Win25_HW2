@@ -166,9 +166,14 @@ if __name__ == '__main__':
                                         size_batch=SIZE_BATCH,
                                         return_filenames=True)
     
-    video_paths = [p for p in np.concatenate([d[2] for d in test_loader]).tolist()]
+    video_paths = []
+    a_groundtruth = []
 
-    a_groundtruth = np.concatenate([d[-1] for d in test_loader])
+    for d in test_loader:
+        video_paths += list(d[2])
+        a_groundtruth += list(d[-1])
+
+    a_groundtruth = np.array(a_groundtruth)
 
     # Load dataset again without the filenames 
     _, test_loader = utils.load_dataset(DIR_DATASET,
